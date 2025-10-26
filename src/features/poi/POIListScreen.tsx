@@ -12,6 +12,7 @@ import {
   ActionSheetIOS
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useRef } from 'react';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { POIStackParamList } from '../../navigation/types';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -33,41 +34,64 @@ export default function POIListScreen({ navigation: nav }: POIListScreenProps) {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const isMounted = useRef(true);
+  const lastRequestTime = useRef(0);
 
   const loadPage = useCallback(async (targetPage: number, replace = false) => {
-    if (loading || refreshing || (targetPage > 1 && data.length >= total && total > 0)) {
+    // Prevent multiple simultaneous requests and rapid firing
+    const now = Date.now();
+    if (now - lastRequestTime.current < 1000) { // 1 second debounce
+      console.log('Skipping rapid request');
+      return;
+    }
+    lastRequestTime.current = now;
+
+    const isInitialLoad = targetPage === 1 && !loading && !refreshing;
+    const shouldSkip = 
+      (loading && !isInitialLoad) || 
+      (targetPage > 1 && (data.length >= total || !total));
+      
+    if (shouldSkip) {
+      console.log('Skipping load:', { targetPage, loading, refreshing, dataLength: data.length, total });
       return;
     }
     
-    setLoading(true);
+    console.log('Loading page:', targetPage, 'replace:', replace);
+    
     try {
-      // First try to get data from the server
-      try {
-        const res = await poiService.list(targetPage, limit);
-        if (res && res.data) {
-          setTotal(res.total || res.data.length);
-          if (replace) {
-            setData(res.data);
-          } else {
-            setData(prev => (targetPage === 1 ? res.data : [...prev, ...res.data]));
-          }
-          setPage(targetPage);
-          return;
-        }
-      } catch (error) {
-        console.error('Error fetching from server, falling back to getPOIs:', error);
+      if (isInitialLoad) {
+        setLoading(true);
+      } else if (replace || targetPage === 1) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
       }
       
-      // Fallback to getPOIs if list fails or returns unexpected format
-      const pois = await poiService.getPOIs(targetPage, limit);
-      if (pois && Array.isArray(pois)) {
-        setTotal(pois.length);
-        setData(prev => (targetPage === 1 ? pois : [...prev, ...pois]));
+      const response = await poiService.list(targetPage, limit);
+      console.log('API Response:', response);
+      
+      if (response && Array.isArray(response.data)) {
+        const newData = response.data;
+        
+        setTotal(response.total || newData.length);
+        setData(prev => {
+          if (replace || targetPage === 1) {
+            return newData;
+          }
+          // Merge with existing data, avoiding duplicates
+          const existingIds = new Set(prev.map(item => item.id));
+          const uniqueNewData = newData.filter(item => !existingIds.has(item.id));
+          return [...prev, ...uniqueNewData];
+        });
+        
         setPage(targetPage);
       }
     } catch (error) {
       console.error('Error loading POIs:', error);
-      Alert.alert('Error', 'Failed to load POIs. Please try again.');
+      // Only show error on initial load or refresh
+      if (targetPage === 1) {
+        Alert.alert('Error', 'Failed to load POIs. Please try again.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -76,22 +100,54 @@ export default function POIListScreen({ navigation: nav }: POIListScreenProps) {
 
   useFocusEffect(
     useCallback(() => {
-      loadPage(1, true);
-    }, [loadPage])
+      // Only load if we don't have data
+      if (data.length === 0) {
+        console.log('Initial load - fetching data');
+        loadPage(1, true);
+      }
+      
+      // Cleanup function
+      return () => {
+        // Any cleanup if needed
+      };
+    }, [loadPage, data.length])
   );
 
   const onEndReached = useCallback(() => {
-    const hasMore = data.length < total;
-    if (!loading && hasMore && !refreshing) {
+    const hasMore = total === 0 || data.length < total;
+    const shouldLoadMore = !loading && hasMore && !refreshing;
+    
+    if (shouldLoadMore) {
+      console.log('Loading more items...');
       loadPage(page + 1);
+    } else {
+      console.log('Skipping load more:', { 
+        loading, 
+        hasMore, 
+        refreshing, 
+        dataLength: data.length, 
+        total,
+        nextPage: page + 1
+      });
     }
   }, [data.length, total, loading, refreshing, page, loadPage]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadPage(1, true);
-    setRefreshing(false);
-  };
+  const onRefresh = useCallback(async () => {
+    if (refreshing) {
+      console.log('Refresh already in progress');
+      return;
+    }
+    
+    console.log('Starting manual refresh');
+    try {
+      // Clear existing data before refresh
+      setData([]);
+      setPage(1);
+      await loadPage(1, true);
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    }
+  }, [loadPage, refreshing]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -190,8 +246,8 @@ export default function POIListScreen({ navigation: nav }: POIListScreenProps) {
 
   if (loading && data.length === 0) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
+      <View style={styles.center} testID="loading-indicator">
+        <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }
@@ -208,12 +264,18 @@ export default function POIListScreen({ navigation: nav }: POIListScreenProps) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
-          <View style={styles.centerEmpty}>
-            {loading ? (
-              <ActivityIndicator size="large" />
-            ) : (
-              <Text>No POIs found</Text>
-            )}
+          <View style={styles.centerEmpty} testID="empty-state">
+            <View style={styles.emptyStateContainer}>
+              <MaterialIcons name="location-off" size={48} color="#999" />
+              <Text style={styles.emptyStateText}>
+                {loading ? 'Loading...' : 'No points of interest found'}
+              </Text>
+              {!loading && (
+                <Text style={styles.emptyStateSubtext}>
+                  Tap the + button to add a new location
+                </Text>
+              )}
+            </View>
           </View>
         }
         ListFooterComponent={
@@ -289,10 +351,30 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   centerEmpty: { 
-    flexGrow: 1, 
+    flex: 1,
     alignItems: 'center', 
     justifyContent: 'center',
     padding: 20,
+    marginTop: 50,
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    maxWidth: 300,
   },
   item: { padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ddd' },
   itemTitle: { fontSize: 16, fontWeight: '600' },
