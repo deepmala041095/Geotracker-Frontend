@@ -96,19 +96,19 @@ export default function POIFormScreen() {
     try {
       if (isCreateMode) {
         console.log('Creating new POI...');
-        await poiService.create({
-          name: name.trim(),
-          description: description.trim() || undefined,
-          latitude: isNaN(lat) ? undefined : lat,
-          longitude: isNaN(lng) ? undefined : lng,
+        await poiService.createPOI({
+          name: name.trim() || 'Unnamed POI',
+          description: description.trim() || '',
+          latitude: isNaN(lat) ? 0 : lat,
+          longitude: isNaN(lng) ? 0 : lng,
         });
       } else if (id) {
         console.log(`Updating POI with ID: ${id}`);
-        await poiService.update(Number(id), {
-          name: name.trim(),
-          description: description.trim() || undefined,
-          latitude: isNaN(lat) ? undefined : lat,
-          longitude: isNaN(lng) ? undefined : lng,
+        await poiService.updatePOI(id, {
+          name: name.trim() || 'Unnamed POI',
+          description: description.trim() || '',
+          latitude: isNaN(lat) ? 0 : lat,
+          longitude: isNaN(lng) ? 0 : lng,
         });
       }
       navigation.goBack();

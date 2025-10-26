@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 interface POI {
-  id: number;
+  id: string;
   name: string;
   description: string;
   latitude: number;

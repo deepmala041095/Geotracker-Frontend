@@ -11,8 +11,8 @@ export default function MapScreen() {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await poiService.list(1, 200);
-        setPois(res.data);
+        const pois = await poiService.getPOIs(1, 200);
+        setPois(pois);
       } finally {
         setLoading(false);
       }

@@ -1,26 +1,17 @@
 import React from 'react';
-import { View, Text } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import POIListScreen from '../features/poi/POIListScreen';
+import POIDetailScreen from '../features/poi/POIDetailScreen';
 import POIFormScreen from '../features/poi/POIFormScreen';
-// Import POIDetailScreen if it exists, otherwise we'll need to create it
-// import POIDetailScreen from '../features/poi/POIDetailScreen';
 
 export type POIStackParamList = {
   POIList: undefined;
-  POIForm: { id?: string };
-  POIDetail: { id: number };
+  POIForm: { id?: string | number };
+  POIDetail: { id: string | number };
 };
 
 const Stack = createNativeStackNavigator<POIStackParamList>();
 
-function POIDetailScreen() {
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>POI Detail Screen</Text>
-    </View>
-  );
-}
 
 export default function POIStack() {
   return (
@@ -31,14 +22,19 @@ export default function POIStack() {
         options={{ title: 'Points of Interest' }}
       />
       <Stack.Screen 
-        name="POIForm" 
-        component={POIFormScreen} 
-        options={{ title: 'Add POI' }}
-      />
-      <Stack.Screen 
         name="POIDetail" 
         component={POIDetailScreen} 
-        options={{ title: 'POI Details' }}
+        options={({ route }) => ({ 
+          title: 'POI Details',
+          // You can customize the header here if needed
+        })}
+      />
+      <Stack.Screen 
+        name="POIForm" 
+        component={POIFormScreen} 
+        options={({ route }) => ({
+          title: route.params?.id ? 'Edit POI' : 'Add POI'
+        })}
       />
     </Stack.Navigator>
   );
