@@ -2,6 +2,7 @@
   "expo": {
     "name": "GeoTracker",
     "slug": "GeoTracker",
+    "owner": "deepmala",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,6 +20,8 @@
       }
     },
     "android": {
+      "package": "com.deepmala.geotracker",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -32,6 +35,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "apiBaseUrl": "https://geotracker-backend.onrender.com/api",
+      "eas": {
+        "projectId": "6798922b-5c8e-4584-806c-582f3686adc8"
+      }
     }
   }
 }

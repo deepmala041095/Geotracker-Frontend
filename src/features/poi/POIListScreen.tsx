@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import * as Location from 'expo-location';
 import { 
   View, 
   Text, 
@@ -12,13 +13,12 @@ import {
   ActionSheetIOS
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import * as Location from 'expo-location';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { POIStackParamList } from '../../navigation/types';
 import { MaterialIcons } from '@expo/vector-icons';
 import { poiService, type POI, type Paginated } from '../../api/poiService';
+import { RootStackParamList } from '../../types/navigation';
 
-type POIListScreenNavigationProp = NativeStackNavigationProp<POIStackParamList, 'POIList'>;
+type POIListScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'POIList'>;
 
 interface POIListScreenProps {
   navigation: POIListScreenNavigationProp;
@@ -206,13 +206,13 @@ export default function POIListScreen({ navigation: nav }: POIListScreenProps) {
   }, [loadPOIs, refreshing, loading]);
 
   // Handle delete with proper error handling
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string | number) => {
     try {
       // Show loading indicator
       const itemIndex = data.findIndex(item => item.id === id);
       if (itemIndex === -1) return;
 
-      await poiService.deletePOI(id);
+      await poiService.deletePOI(id.toString());
       
       // Remove item optimistically
       setData(prev => prev.filter(item => item.id !== id));
@@ -235,7 +235,7 @@ export default function POIListScreen({ navigation: nav }: POIListScreenProps) {
     }
   };
 
-  const showActionSheet = (id: string | number) => {
+  const showActionSheet = (id: string) => {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
@@ -328,36 +328,45 @@ export default function POIListScreen({ navigation: nav }: POIListScreenProps) {
     </View>
   );
 
-  const renderItem = ({ item }: { item: POI }) => (
-    <TouchableOpacity 
-      onPress={() => navigation.navigate('POIDetail', { id: item.id })}
-      onLongPress={() => showActionSheet(item.id)}
-      style={styles.itemContainer}
-      activeOpacity={0.7}
-    >
-      <View style={styles.itemContent}>
-        <Text style={styles.itemTitle}>{item.name}</Text>
-        {item.description ? (
-          <Text style={styles.itemDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
-        ) : null}
-        <View style={styles.locationContainer}>
-          <MaterialIcons name="location-on" size={16} color="#666" />
-          <Text style={styles.locationText}>
-            {item.latitude?.toFixed(4)}, {item.longitude?.toFixed(4)}
-          </Text>
-        </View>
-      </View>
+  const renderItem = ({ item }: { item: POI & { distance?: number } }) => {
+    // Ensure we have valid coordinates for the location text
+    const hasCoords = typeof item.latitude === 'number' && typeof item.longitude === 'number';
+    
+    return (
       <TouchableOpacity 
-        onPress={() => showActionSheet(item.id)}
-        style={styles.menuButton}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        onPress={() => navigation.navigate('POIDetail', { 
+          id: item.id.toString(),
+          distance: item.distance
+        })}
+        style={styles.itemContainer}
+        activeOpacity={0.7}
       >
-        <MaterialIcons name="more-vert" size={24} color="#666" />
+        <View style={styles.itemContent}>
+          <Text style={styles.itemTitle}>{item.name}</Text>
+          {item.description ? (
+            <Text style={styles.itemDescription} numberOfLines={2}>
+              {item.description}
+            </Text>
+          ) : null}
+          {hasCoords && (
+            <View style={styles.locationContainer}>
+              <MaterialIcons name="location-on" size={14} color="#888" />
+              <Text style={styles.locationText}>
+                {item.latitude?.toFixed(4)}, {item.longitude?.toFixed(4)}
+              </Text>
+            </View>
+          )}
+        </View>
+        <TouchableOpacity 
+          onPress={() => showActionSheet(item.id.toString())}
+          style={styles.menuButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialIcons name="more-vert" size={24} color="#666" />
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   // Show loading indicator on initial load
   if (loading && data.length === 0) {

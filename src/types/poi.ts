@@ -4,7 +4,20 @@ export interface POI {
   description: string;
   latitude: number;
   longitude: number;
-  createdAt: Date;
+  address?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  category?: string;
+  hours?: string;
+  rating?: number;
+  tags?: string[];
+  updatedAt?: string | Date;
+  createdAt: Date | string;
+  location?: {
+    type: string;
+    coordinates: number[];
+  };
 }
 
-export type NewPOI = Omit<POI, 'id' | 'createdAt'>;
+export type NewPOI = Omit<POI, 'id' | 'createdAt' | 'updatedAt'>;

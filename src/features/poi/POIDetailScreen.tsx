@@ -19,7 +19,7 @@ import * as Location from 'expo-location';
 import * as WebBrowser from 'expo-web-browser';
 
 interface RouteParams {
-  id: number;
+  id: string | number;
   distance?: number;
 }
 
@@ -56,7 +56,7 @@ const DetailRow = ({ icon, label, value, isLink = false, onPress }: {
 export default function POIDetailScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
-  const { id, distance } = (route.params || {}) as RouteParams;
+  const { id, distance } = (route.params || {}) as RouteParams & { distance?: number };
 
   const [poi, setPoi] = useState<POI | null>(null);
   const [loading, setLoading] = useState(true);
@@ -156,7 +156,7 @@ export default function POIDetailScreen() {
     
     try {
       await Share.share({
-        message: `Check out ${poi.name} at ${poi.address || 'this location'}. ${poi.website ? `Website: ${poi.website}` : ''}`,
+        message: `Check out ${poi.name} at ${poi.latitude}, ${poi.longitude}.`,
         title: poi.name
       });
     } catch (error) {
@@ -252,9 +252,9 @@ export default function POIDetailScreen() {
           <Text style={styles.sectionTitle}>Details</Text>
           
           <DetailRow 
-            icon={<MaterialIcons name="location-on" size={20} color="#666" />}
-            label="Address"
-            value={poi.address}
+            icon={<MaterialIcons name="location-on" size={20} color="666" />}
+            label="Location"
+            value={`${poi.latitude?.toFixed(4)}, ${poi.longitude?.toFixed(4)}`}
             isLink={!!poi.latitude && !!poi.longitude}
             onPress={handleGetDirections}
           />
@@ -283,7 +283,7 @@ export default function POIDetailScreen() {
             <DetailRow 
               icon={<MaterialIcons name="public" size={20} color="#666" />}
               label="Website"
-              value={poi.website}
+              value={poi.website.replace(/^https?:\/\//, '')}
               isLink
               onPress={() => handleOpenWebsite(poi.website!)}
             />
